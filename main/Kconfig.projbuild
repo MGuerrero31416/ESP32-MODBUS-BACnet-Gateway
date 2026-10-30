@@ -1,0 +1,197 @@
+menu "Project hardware"
+
+    choice USER_DISPLAY_PROFILE
+        prompt "Display profile"
+        default USER_DISPLAY_NONE
+
+        config USER_DISPLAY_ST7796S
+            bool "ST7796S 480x320 3.5in - colorful UI"
+
+        config USER_DISPLAY_ST7796S_TEST
+            bool "ST7796S 480x320 - test UI"
+
+        config USER_DISPLAY_LVGL_TDISPLAY_S3
+		bool "LVGL T-Display S3 - LilyGO LVGL UI"
+
+        config USER_DISPLAY_ST7789_GMT020
+            bool "ST7789 240x320 - GMT020-02-7P"
+
+        config USER_DISPLAY_ST7789_HW657A
+            bool "ST7789 170x320 - HW657A - Simple UI"
+
+        config USER_DISPLAY_IDEASPARK
+            bool "Ideaspark - ESP32-WROOM-32 ST7789 1.9in 170x320"
+            depends on IDF_TARGET_ESP32
+
+        config USER_DISPLAY_LORA_GATEWAY
+            bool "Heltec LoRa 32 V4 OLED (gateway hardware only)"
+
+        config USER_DISPLAY_NONE
+            bool "No display"
+
+    endchoice
+
+choice USER_IDEASPARK_BACKLIGHT
+    prompt "Ideaspark backlight GPIO"
+    depends on USER_DISPLAY_IDEASPARK
+    default USER_IDEASPARK_BACKLIGHT_GPIO32
+    help
+        Select the backlight pin fitted to your Ideaspark board revision.
+
+    config USER_IDEASPARK_BACKLIGHT_GPIO32
+        bool "GPIO 32"
+
+    config USER_IDEASPARK_BACKLIGHT_GPIO27
+        bool "GPIO 27"
+endchoice
+
+config USER_IDEASPARK_BACKLIGHT_GPIO
+    int
+    depends on USER_DISPLAY_IDEASPARK
+    default 27 if USER_IDEASPARK_BACKLIGHT_GPIO27
+    default 32
+
+# CST816 touch (LilyGO T-Display-S3 only)
+config USER_TOUCH_CST816
+    bool "Enable CST816 touch controller"
+    default y if USER_DISPLAY_LVGL_TDISPLAY_S3
+    default n
+
+config USER_TOUCH_CST816_I2C_PORT
+    int
+    default 0
+
+config USER_TOUCH_CST816_SDA_GPIO
+    int
+    default 18
+
+config USER_TOUCH_CST816_SCL_GPIO
+    int
+    default 17
+
+config USER_TOUCH_CST816_ADDR
+    hex
+    default 0x15
+
+config USER_TOUCH_CST816_RST_GPIO
+    int
+    default 21
+
+config USER_TOUCH_CST816_INT_GPIO
+    int
+    default 16
+
+# MS/TP RS-485 transceiver (MAX485). GPIO5/16/17 collide with the
+# T-Display-S3 board's TFT reset and touch I2C pins, so that profile
+# uses free header pins instead.
+# The LoRa gateway profile uses the working MAX485 mapping: GPIO34 = DI,
+# GPIO6 = RO, and GPIO33 = DE/RE.
+config USER_MSTP_UART_TX_GPIO
+    int "BACnet MS/TP TX GPIO"
+    default 34 if USER_DISPLAY_LORA_GATEWAY
+    default 1 if USER_DISPLAY_LVGL_TDISPLAY_S3
+    default 17
+
+config USER_MSTP_UART_RX_GPIO
+    int "BACnet MS/TP RX GPIO"
+    default 6 if USER_DISPLAY_LORA_GATEWAY
+    default 2 if USER_DISPLAY_LVGL_TDISPLAY_S3
+    default 16
+
+config USER_MSTP_UART_DE_GPIO
+    int "BACnet MS/TP DE/RE GPIO"
+    default 33 if USER_DISPLAY_LORA_GATEWAY
+    default 3 if USER_DISPLAY_LVGL_TDISPLAY_S3
+    default 5
+
+config USER_MSTP_UART_PORT
+    int "BACnet MS/TP UART number"
+    range 1 2
+    default 2
+    help
+        UART0 is reserved for the serial console. Use a different UART
+        from the Modbus RTU port.
+
+menu "Modbus RTU hardware"
+
+config USER_MODBUS_RTU
+    bool "Configure Modbus RTU port"
+    default y if USER_DISPLAY_IDEASPARK
+    default n
+    help
+        Validate the two independent RS485 port allocations at startup.
+        This conversion stage configures hardware only; it does not install
+        a Modbus UART driver or start polling.
+        Ideaspark has profile-specific defaults; other profiles require an
+        explicit GPIO allocation before enabling this option.
+
+if USER_MODBUS_RTU
+
+config USER_MODBUS_UART_PORT
+    int "Modbus UART number"
+    range 1 2
+    default 1
+
+config USER_MODBUS_UART_TX_GPIO
+    int "Modbus TX GPIO"
+    range -1 48
+    default 25 if USER_DISPLAY_IDEASPARK
+    default -1
+
+config USER_MODBUS_UART_RX_GPIO
+    int "Modbus RX GPIO"
+    range -1 48
+    default 26 if USER_DISPLAY_IDEASPARK
+    default -1
+
+config USER_MODBUS_UART_DE_GPIO
+    int "Modbus DE/RE GPIO"
+    range -1 48
+    default 33 if USER_DISPLAY_IDEASPARK
+    default -1
+    help
+        Connect DE and active-low RE together for manual direction control.
+        High selects transmit; low selects receive.
+
+config USER_MODBUS_BAUD_RATE
+    int "Modbus baud rate"
+    range 1200 115200
+    default 9600
+
+choice USER_MODBUS_PARITY
+    prompt "Modbus parity (8 data bits)"
+    default USER_MODBUS_PARITY_EVEN
+
+    config USER_MODBUS_PARITY_NONE
+        bool "None"
+    config USER_MODBUS_PARITY_EVEN
+        bool "Even"
+    config USER_MODBUS_PARITY_ODD
+        bool "Odd"
+endchoice
+
+config USER_MODBUS_STOP_BITS
+    int "Modbus stop bits"
+    range 1 2
+    default 2 if USER_MODBUS_PARITY_NONE
+    default 1
+
+config USER_MODBUS_RESPONSE_TIMEOUT_MS
+    int "Modbus response timeout (ms)"
+    range 10 10000
+    default 1000
+
+config USER_MODBUS_RETRIES
+    int "Modbus retries after the first attempt"
+    range 0 10
+    default 2
+
+config USER_MODBUS_POLL_INTERVAL_MS
+    int "Default point polling interval (ms)"
+    range 100 3600000
+    default 1000
+
+endif
+endmenu
+
+endmenu

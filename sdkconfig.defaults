@@ -1,0 +1,61 @@
+# Common project defaults
+# Target-specific flash, PSRAM, and partition settings belong in:
+# sdkconfig.defaults.esp32
+# sdkconfig.defaults.esp32s3
+
+# FreeRTOS
+
+CONFIG_FREERTOS_HZ=1000
+
+# Memory optimization profile
+
+CONFIG_COMPILER_OPTIMIZATION_SIZE=y
+# Keep assertions enabled but reduce assertion string footprint.
+CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_SILENT=y
+
+# CONFIG_COMPILER_OPTIMIZATION_DEBUG is not set
+
+# Save IRAM while retaining Wi-Fi and BACnet/IP functionality
+
+# CONFIG_ESP_WIFI_IRAM_OPT is not set
+
+# Disable unused networking features
+
+# CONFIG_LWIP_IPV6 is not set
+
+# CONFIG_FMB_MDNS_INTEGRATION_ENABLE is not set
+
+# TLS certificate bundle for secure MQTT connections
+
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=y
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_FULL=y
+
+# Trim unused Arduino libraries to fit fixed app partitions on ESP-IDF 6.
+CONFIG_ARDUINO_SELECTIVE_COMPILATION=y
+CONFIG_ARDUINO_SELECTIVE_SPI=y
+CONFIG_ARDUINO_SELECTIVE_Wire=y
+# Keep LVGL runtime features but skip compiling bundled examples to save flash.
+CONFIG_LV_BUILD_EXAMPLES=n
+# CONFIG_ARDUINO_SELECTIVE_ESP_SR is not set
+# CONFIG_ARDUINO_SELECTIVE_ESP_Video is not set
+# CONFIG_ARDUINO_SELECTIVE_EEPROM is not set
+# CONFIG_ARDUINO_SELECTIVE_Preferences is not set
+# CONFIG_ARDUINO_SELECTIVE_Ticker is not set
+# CONFIG_ARDUINO_SELECTIVE_Update is not set
+# CONFIG_ARDUINO_SELECTIVE_Zigbee is not set
+CONFIG_ARDUINO_SELECTIVE_FS=y
+# CONFIG_ARDUINO_SELECTIVE_SD is not set
+# CONFIG_ARDUINO_SELECTIVE_SD_MMC is not set
+CONFIG_ARDUINO_SELECTIVE_SPIFFS=y
+# CONFIG_ARDUINO_SELECTIVE_FFat is not set
+# CONFIG_ARDUINO_SELECTIVE_LittleFS is not set
+# CONFIG_ARDUINO_SELECTIVE_Network is not set
+# CONFIG_ARDUINO_SELECTIVE_Ethernet is not set
+# CONFIG_ARDUINO_SELECTIVE_PPP is not set
+# CONFIG_ARDUINO_SELECTIVE_Hash is not set
+# CONFIG_ARDUINO_SELECTIVE_BLE is not set
+# CONFIG_ARDUINO_SELECTIVE_BluetoothSerial is not set
+# CONFIG_ARDUINO_SELECTIVE_SimpleBLE is not set
+# CONFIG_ARDUINO_SELECTIVE_RainMaker is not set
+# CONFIG_ARDUINO_SELECTIVE_OpenThread is not set
+# CONFIG_ARDUINO_SELECTIVE_Insights is not set

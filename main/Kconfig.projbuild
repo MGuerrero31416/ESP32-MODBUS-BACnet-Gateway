@@ -115,13 +115,12 @@ config USER_MSTP_UART_PORT
 menu "Modbus RTU hardware"
 
 config USER_MODBUS_RTU
-    bool "Configure Modbus RTU port"
+    bool "Enable Modbus RTU service"
     default y if USER_DISPLAY_IDEASPARK
     default n
     help
-        Validate the two independent RS485 port allocations at startup.
-        This conversion stage configures hardware only; it does not install
-        a Modbus UART driver or start polling.
+        Validate the independent RS485 ports and run scheduled Modbus polling.
+        With an empty point table no UART driver or traffic is started.
         Ideaspark has profile-specific defaults; other profiles require an
         explicit GPIO allocation before enabling this option.
 
@@ -150,8 +149,9 @@ config USER_MODBUS_UART_DE_GPIO
     default 33 if USER_DISPLAY_IDEASPARK
     default -1
     help
-        Connect DE and active-low RE together for manual direction control.
-        High selects transmit; low selects receive.
+        Connect DE and active-low RE together to UART RTS direction control.
+        High selects transmit; low selects receive. The UART half-duplex
+        driver switches direction after the last stop bit is transmitted.
 
 config USER_MODBUS_BAUD_RATE
     int "Modbus baud rate"
@@ -190,6 +190,31 @@ config USER_MODBUS_POLL_INTERVAL_MS
     int "Default point polling interval (ms)"
     range 100 3600000
     default 1000
+    help
+        Reference default for new mappings. Each table entry specifies its
+        own polling interval; this does not override compiled point timings.
+
+config USER_MODBUS_MAX_READ_REGISTERS
+    int "Maximum registers in one read"
+    range 2 125
+    default 2
+    help
+        Group only due points on the same slave/table with matching polling
+        intervals and no gaps. Two permits float32 while remaining conservative.
+        Increase only if the device supports larger contiguous reads.
+
+config USER_MODBUS_MAX_READ_BITS
+    int "Maximum coils/discrete inputs in one read"
+    range 1 2000
+    default 1
+
+config USER_MODBUS_BACKOFF_MAX_MS
+    int "Maximum offline slave backoff (ms)"
+    range 1000 60000
+    default 30000
+    help
+        Communication failures back off all points on that slave from 1 second,
+        doubling up to this limit. Other slaves continue to be polled.
 
 endif
 endmenu

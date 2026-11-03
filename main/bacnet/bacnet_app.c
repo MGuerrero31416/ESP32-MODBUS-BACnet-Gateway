@@ -840,6 +840,7 @@ static void bacnet_cov_task(void *pvParameters)
 
         if (active_datalink) {
             bacnet_datalink_lock(active_datalink);
+            bacnet_update_mapped_objects();
             handler_cov_timer_seconds(1);
             bacnet_profile_notify(BACNET_APP_PROFILE_COV_NOTIFICATION);
             bacnet_cov_process_full_cycle();
@@ -1044,16 +1045,9 @@ static void bacnet_cov_process_full_cycle(void)
 
 static void bacnet_dispatcher_tick_100ms(void)
 {
-    tsm_timer_milliseconds(100);
-
     /*
-     * Process one complete bounded COV FSM cycle under a single
-     * datalink. This prevents large subscription sets from taking
-     * many seconds to scan and ensures outgoing NAE notifications
-     * use MS/TP rather than being consumed through BACnet/IP.
-     *
-     * BACnet/IP remains fully available for ordinary ReadProperty
-     * and WriteProperty requests.
+     * Serialize retries and the bounded COV scan with request handlers.
+     * Each subscription/transaction retains its own originating datalink.
      */
     if (s_mstp_ready) {
 #if defined(CONFIG_USER_DISPLAY_LORA_GATEWAY) && CONFIG_USER_DISPLAY_LORA_GATEWAY
@@ -1061,6 +1055,8 @@ static void bacnet_dispatcher_tick_100ms(void)
 #endif
         bacnet_datalink_lock(s_datalink_mstp);
 
+        tsm_timer_milliseconds(100);
+        bacnet_update_mapped_objects();
         bacnet_profile_notify(
             BACNET_APP_PROFILE_COV_NOTIFICATION);
 
@@ -1073,6 +1069,8 @@ static void bacnet_dispatcher_tick_100ms(void)
     } else if (s_bip_ready) {
         bacnet_datalink_lock(s_datalink_bip);
 
+        tsm_timer_milliseconds(100);
+        bacnet_update_mapped_objects();
         bacnet_profile_notify(
             BACNET_APP_PROFILE_COV_NOTIFICATION);
 

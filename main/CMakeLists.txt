@@ -5,6 +5,8 @@ set(APP_SRCS
     "app/app_supervisor.c"
     "app/stack_profiler.c"
     "app/point_mapping.c"
+    "app/modbus_engine.c"
+    "app/modbus_service.c"
 
     "bacnet/bacnet_app.c"
     "bacnet/bacnet_coordinator.c"
@@ -124,6 +126,7 @@ idf_component_register(
         esp_driver_spi
         esp_driver_uart
         esp_timer
+        espressif__esp-modbus
         mqtt
         mbedtls
 )

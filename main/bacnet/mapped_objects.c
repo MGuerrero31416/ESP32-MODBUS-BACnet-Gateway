@@ -3,8 +3,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <float.h>
 
 #include "User_Settings.h"
+#include "modbus_service.h"
+#include "bacnet/bacapp.h"
 #include "bacnet/basic/object/ai.h"
 #include "bacnet/basic/object/av.h"
 #include "bacnet/basic/object/bi.h"
@@ -18,6 +21,186 @@ static const char *TAG = "mapped_objects";
 static const char *NVS_NAMESPACE = "gw_points_v1";
 static char saved_names[GATEWAY_MAX_POINTS][65];
 static char saved_descriptions[GATEWAY_MAX_POINTS][129];
+static uint32_t next_write_id;
+static bool invalid_sample[GATEWAY_MAX_POINTS];
+
+static bool out_of_service(const gateway_point_mapping_t *p)
+{
+    switch (p->object_type) {
+    case GATEWAY_OBJECT_AI: return Analog_Input_Out_Of_Service(p->instance);
+    case GATEWAY_OBJECT_AV: return Analog_Value_Out_Of_Service(p->instance);
+    case GATEWAY_OBJECT_BI: return Binary_Input_Out_Of_Service(p->instance);
+    case GATEWAY_OBJECT_BV: return Binary_Value_Out_Of_Service(p->instance);
+    }
+    return false;
+}
+
+static bool set_value(const gateway_point_mapping_t *p, double value)
+{
+    switch (p->object_type) {
+    case GATEWAY_OBJECT_AI:
+        Analog_Input_Present_Value_Set(p->instance, (float)value);
+        return true;
+    case GATEWAY_OBJECT_AV:
+        return Analog_Value_Present_Value_Set(p->instance, (float)value, 16);
+    case GATEWAY_OBJECT_BI:
+        return Binary_Input_Present_Value_Set(p->instance,
+            value != 0 ? BINARY_ACTIVE : BINARY_INACTIVE);
+    case GATEWAY_OBJECT_BV:
+        return Binary_Value_Present_Value_Set(p->instance,
+            value != 0 ? BINARY_ACTIVE : BINARY_INACTIVE);
+    }
+    return false;
+}
+
+static bool set_reliability(const gateway_point_mapping_t *p, BACNET_RELIABILITY value)
+{
+    switch (p->object_type) {
+    case GATEWAY_OBJECT_AI: return Analog_Input_Reliability_Set(p->instance, value);
+    case GATEWAY_OBJECT_AV: return Analog_Value_Reliability_Set(p->instance, value);
+    case GATEWAY_OBJECT_BI: return Binary_Input_Reliability_Set(p->instance, value);
+    case GATEWAY_OBJECT_BV: return Binary_Value_Reliability_Set(p->instance, value);
+    }
+    return false;
+}
+
+void bacnet_update_mapped_objects(void)
+{
+    for (size_t i = 0; i < USER_POINT_MAPPING_COUNT; ++i) {
+        const gateway_point_mapping_t *p = &USER_POINT_MAPPINGS[i];
+        if (out_of_service(p)) {
+            continue;
+        }
+        modbus_point_state_t state;
+        bool pending;
+        if (modbus_service_get_point(i, &state, &pending) != ESP_OK) {
+            ESP_LOGE(TAG, "Cannot read Modbus snapshot for %s", p->name);
+            if (!set_reliability(p, RELIABILITY_COMMUNICATION_FAILURE)) {
+                ESP_LOGE(TAG, "Cannot fault mapped object %s", p->name);
+            }
+            continue;
+        }
+        bool binary = p->data_type == GATEWAY_BOOL;
+        bool representable = isfinite(state.value) &&
+            (binary ? (state.value == 0 || state.value == 1) : fabs(state.value) <= FLT_MAX);
+        BACNET_RELIABILITY reliability = RELIABILITY_NO_FAULT_DETECTED;
+        if (!state.acquired || state.quality != MODBUS_POINT_GOOD) {
+            reliability = state.last_result == MODBUS_INVALID_VALUE ?
+                RELIABILITY_UNRELIABLE_OTHER : RELIABILITY_COMMUNICATION_FAILURE;
+        } else if (!representable) {
+            reliability = RELIABILITY_UNRELIABLE_OTHER;
+        }
+        if (state.acquired && state.quality == MODBUS_POINT_GOOD && !representable) {
+            if (!invalid_sample[i]) {
+                ESP_LOGE(TAG, "Modbus value cannot be represented by BACnet point %s", p->name);
+            }
+            invalid_sample[i] = true;
+        } else {
+            invalid_sample[i] = false;
+        }
+        if (state.acquired && state.quality == MODBUS_POINT_GOOD && representable &&
+            !set_value(p, state.value)) {
+            reliability = RELIABILITY_UNRELIABLE_OTHER;
+            ESP_LOGE(TAG, "Cannot update Present_Value for %s", p->name);
+        }
+        /* A good poll must not hide a failed command. A later successful write clears it. */
+        if (state.write_completed && state.last_write_result != MODBUS_OK &&
+            reliability == RELIABILITY_NO_FAULT_DETECTED) {
+            reliability = state.last_write_result == MODBUS_TIMEOUT ||
+                state.last_write_result == MODBUS_BAD_RESPONSE ||
+                state.last_write_result == MODBUS_IO_ERROR ||
+                state.last_write_result == MODBUS_OFFLINE ?
+                RELIABILITY_COMMUNICATION_FAILURE : RELIABILITY_PROCESS_ERROR;
+        }
+        if (!set_reliability(p, reliability)) {
+            ESP_LOGE(TAG, "Cannot update Reliability for %s", p->name);
+        }
+    }
+}
+
+static bool write_error(BACNET_WRITE_PROPERTY_DATA *wp, BACNET_ERROR_CLASS cls,
+    BACNET_ERROR_CODE code, const gateway_point_mapping_t *p)
+{
+    wp->error_class = cls;
+    wp->error_code = code;
+    ESP_LOGW(TAG, "Write rejected for %s: class=%u code=%u",
+        p->name, (unsigned)cls, (unsigned)code);
+    return false;
+}
+
+static bool decode_property_value(BACNET_WRITE_PROPERTY_DATA *wp,
+    BACNET_APPLICATION_DATA_VALUE *data, const gateway_point_mapping_t *p)
+{
+    if (wp->array_index != BACNET_ARRAY_ALL) {
+        return write_error(wp, ERROR_CLASS_PROPERTY, ERROR_CODE_PROPERTY_IS_NOT_AN_ARRAY, p);
+    }
+    int length = wp->application_data_len > 0 ?
+        bacapp_decode_application_data(wp->application_data, wp->application_data_len, data) : -1;
+    if (length <= 0 || length != wp->application_data_len) {
+        return write_error(wp, ERROR_CLASS_PROPERTY, ERROR_CODE_VALUE_OUT_OF_RANGE, p);
+    }
+    return true;
+}
+
+static bool write_present_value(BACNET_WRITE_PROPERTY_DATA *wp,
+    const gateway_point_mapping_t *p)
+{
+    bool simulation = out_of_service(p);
+    if (!simulation && p->access != GATEWAY_READ_WRITE) {
+        return write_error(wp, ERROR_CLASS_PROPERTY, ERROR_CODE_WRITE_ACCESS_DENIED, p);
+    }
+    if (wp->priority < 1 || wp->priority > 16 || wp->priority == 6) {
+        return write_error(wp, ERROR_CLASS_PROPERTY, ERROR_CODE_WRITE_ACCESS_DENIED, p);
+    }
+    BACNET_APPLICATION_DATA_VALUE data = {0};
+    if (!decode_property_value(wp, &data, p)) {
+        return false;
+    }
+    double value;
+    if (p->data_type == GATEWAY_BOOL) {
+        if (data.tag != BACNET_APPLICATION_TAG_ENUMERATED) {
+            return write_error(wp, ERROR_CLASS_PROPERTY, ERROR_CODE_INVALID_DATA_TYPE, p);
+        }
+        value = data.type.Enumerated;
+        if (value != 0 && value != 1) {
+            return write_error(wp, ERROR_CLASS_PROPERTY, ERROR_CODE_VALUE_OUT_OF_RANGE, p);
+        }
+    } else {
+        switch (data.tag) {
+        case BACNET_APPLICATION_TAG_REAL: value = data.type.Real; break;
+        case BACNET_APPLICATION_TAG_DOUBLE: value = data.type.Double; break;
+        case BACNET_APPLICATION_TAG_UNSIGNED_INT: value = data.type.Unsigned_Int; break;
+        case BACNET_APPLICATION_TAG_SIGNED_INT: value = data.type.Signed_Int; break;
+        case BACNET_APPLICATION_TAG_ENUMERATED: value = data.type.Enumerated; break;
+        default:
+            return write_error(wp, ERROR_CLASS_PROPERTY, ERROR_CODE_INVALID_DATA_TYPE, p);
+        }
+        if (!isfinite(value) || fabs(value) > FLT_MAX) {
+            return write_error(wp, ERROR_CLASS_PROPERTY, ERROR_CODE_VALUE_OUT_OF_RANGE, p);
+        }
+    }
+    if (simulation) {
+        if (!set_value(p, value) || !set_reliability(p, RELIABILITY_NO_FAULT_DETECTED)) {
+            return write_error(wp, ERROR_CLASS_PROPERTY, ERROR_CODE_VALUE_OUT_OF_RANGE, p);
+        }
+        return true;
+    }
+    if (++next_write_id == 0) {
+        ++next_write_id;
+    }
+    modbus_write_command_t command = {
+        .id = next_write_id, .first_point = (size_t)(p - USER_POINT_MAPPINGS),
+        .count = 1, .values = {value},
+    };
+    esp_err_t err = modbus_service_queue_write(&command);
+    if (err != ESP_OK) {
+        return write_error(wp, err == ESP_ERR_INVALID_ARG ?
+            ERROR_CLASS_PROPERTY : ERROR_CLASS_RESOURCES,
+            err == ESP_ERR_INVALID_ARG ? ERROR_CODE_VALUE_OUT_OF_RANGE : ERROR_CODE_DEVICE_BUSY, p);
+    }
+    /* Leave Present_Value at the last readback until a successful poll. */
+    return true;
+}
 
 static const gateway_point_mapping_t *find_mapping(
     gateway_object_type_t type, uint32_t instance)
@@ -46,14 +229,23 @@ static bool mapped_write_property(BACNET_WRITE_PROPERTY_DATA *wp)
         return false;
     }
     if (wp->object_property == PROP_PRESENT_VALUE) {
-        wp->error_class = ERROR_CLASS_PROPERTY;
-        wp->error_code = point->access == GATEWAY_READ_ONLY ?
-            ERROR_CODE_WRITE_ACCESS_DENIED :
-            ERROR_CODE_OPTIONAL_FUNCTIONALITY_NOT_SUPPORTED;
-        ESP_LOGW(TAG, "Present_Value write rejected for %s: %s", point->name,
-            point->access == GATEWAY_READ_ONLY ? "read-only point" :
-            "Modbus write-through is not implemented");
-        return false;
+        return write_present_value(wp, point);
+    }
+    if (wp->object_property == PROP_OUT_OF_SERVICE) {
+        BACNET_APPLICATION_DATA_VALUE data = {0};
+        if (!decode_property_value(wp, &data, point)) {
+            return false;
+        }
+        if (data.tag != BACNET_APPLICATION_TAG_BOOLEAN) {
+            return write_error(wp, ERROR_CLASS_PROPERTY, ERROR_CODE_INVALID_DATA_TYPE, point);
+        }
+        switch (type) {
+        case GATEWAY_OBJECT_AI: Analog_Input_Out_Of_Service_Set(point->instance, data.type.Boolean); break;
+        case GATEWAY_OBJECT_AV: Analog_Value_Out_Of_Service_Set(point->instance, data.type.Boolean); break;
+        case GATEWAY_OBJECT_BI: Binary_Input_Out_Of_Service_Set(point->instance, data.type.Boolean); break;
+        case GATEWAY_OBJECT_BV: Binary_Value_Out_Of_Service_Set(point->instance, data.type.Boolean); break;
+        }
+        return true;
     }
     switch (type) {
     case GATEWAY_OBJECT_AI: return Analog_Input_Write_Property(wp);

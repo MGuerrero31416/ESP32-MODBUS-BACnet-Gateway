@@ -48,7 +48,21 @@ static enum {
     DATALINK_BSC
 } Datalink_Transport;
 
-void datalink_set(char *datalink_string)
+const char *datalink_name(void)
+{
+    switch (Datalink_Transport) {
+        case DATALINK_ARCNET: return "arcnet";
+        case DATALINK_ETHERNET: return "ethernet";
+        case DATALINK_BIP: return "bip";
+        case DATALINK_BIP6: return "bip6";
+        case DATALINK_MSTP: return "mstp";
+        case DATALINK_ZIGBEE: return "zigbee";
+        case DATALINK_BSC: return "bsc";
+        default: return "none";
+    }
+}
+
+void datalink_set(const char *datalink_string)
 {
     if (bacnet_stricmp("none", datalink_string) == 0) {
         Datalink_Transport = DATALINK_NONE;
@@ -532,7 +546,12 @@ void datalink_set_interface(char *ifname)
     (void)ifname;
 }
 
-void datalink_set(char *datalink_string)
+const char *datalink_name(void)
+{
+    return "none";
+}
+
+void datalink_set(const char *datalink_string)
 {
     (void)datalink_string;
 }

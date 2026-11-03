@@ -14,17 +14,30 @@ on a second RS485 bus. Board, display, and touch hardware profiles are retained.
   sensor roles and parallel object arrays. BACnet objects are created from
   mappings. Sensor, LoRa acquisition, and Adafruit IO application tasks are
   disconnected.
-- **Not implemented yet:** Modbus polling/decoding, write-through, full
-  dual-transport COV verification, and complete gateway UI layouts.
+- **Step 3 complete:** Modbus RTU polling, typed decoding, bounded read grouping,
+  retries/offline recovery, stale detection, and queued writes with completion
+  diagnostics. Ideaspark/HW657A show Modbus acquisition status.
+- **Step 4 complete:** Modbus snapshots update mapped BACnet values/reliability.
+  Permitted Present_Value writes use the existing asynchronous Modbus queue;
+  Out_Of_Service supports local simulation without new Modbus commands.
+- **Step 5 software validation complete:** discovery and ReadProperty retain
+  their ingress link; COV subscriptions and confirmed retries retain their own
+  transport. Host protocol tests cover IP-only, MS/TP-only and interleaved
+  dual-link scenarios. Physical simultaneous operation remains uncommissioned.
+- **Still pending:** hardware/network validation and complete gateway UI layouts.
 
 The active mapping table is deliberately **empty** until an actual device
 register map is supplied. The BACnet Device object remains available; no
 invented Modbus devices or process points are enabled. Configured points start
-in communication-failure, not as valid zero readings. Present_Value writes
-are rejected until Modbus write-through is implemented.
+in communication-failure, not as valid zero readings. Only successful fresh
+samples clear acquisition faults. A BACnet write acknowledgment means queue
+acceptance, not remote execution; Present_Value remains polled readback.
+An empty table leaves Modbus idle without installing a UART driver.
 
 See [Point Mapping Configuration](OBJECTS_CONFIGURATION.md) for all fields,
 validation rules, address conventions, and disabled examples.
+See [dual-transport validation](SETUP.md#dual-transport-validation) for evidence,
+test boundaries, and the remaining physical commissioning checklist.
 
 ## Current board and wiring
 
@@ -68,14 +81,16 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 The separate build directory avoids the stale CMake cache inherited from the
 old project. Building does not flash the device.
 
-See [Build Instructions](docs/BUILD_INSTRUCTIONS.md) for configuration and C
-mapping-validator tests, and [Setup](SETUP.md) for commissioning guidance.
+See [Build Instructions](docs/BUILD_INSTRUCTIONS.md) for configuration and native
+C mapping/Modbus tests, and [Setup](SETUP.md) for commissioning guidance.
 
 ## Source layout
 
 ```text
 main/
   app/point_mapping.*       Mapping model, lookup, and validation
+  app/modbus_engine.*       Portable codec, scheduler, and write planner
+  app/modbus_service.*      ESP-Modbus UART worker, snapshots, and command queue
   app/app_storage.*         NVS initialization
   app/app_supervisor.*      Status/display maintenance
   bacnet/mapped_objects.*   Mapping-driven BACnet object setup

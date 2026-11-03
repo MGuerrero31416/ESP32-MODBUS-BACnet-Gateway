@@ -7,6 +7,7 @@
 
 #include "esp_log.h"
 #include "User_Settings.h"
+#include "modbus_service.h"
 
 static TFT_eSPI tft;
 static const char *TAG = "display";
@@ -164,11 +165,21 @@ extern "C" void display_update_values(
     (void)temp_ds18b20;
     char count[16];
     snprintf(count, sizeof(count), "%u", (unsigned)USER_POINT_MAPPING_COUNT);
+    modbus_service_status_t status;
+    modbus_service_get_status(&status);
+    char modbus_text[20];
+    if (status.mode == MODBUS_SERVICE_RUNNING) {
+        snprintf(modbus_text, sizeof(modbus_text), "%u/%u OK",
+            status.good_points, (unsigned)USER_POINT_MAPPING_COUNT);
+    } else {
+        snprintf(modbus_text, sizeof(modbus_text), "%s",
+            status.mode == MODBUS_SERVICE_IDLE ? "No points" : "Disabled");
+    }
     const char *values[4] = {
         count,
         wifi_link ? "Up" : "Down",
         mstp_link ? "Traffic" : "Idle",
-        "Not active"
+        modbus_text
     };
 
     tft.setTextColor(TFT_WHITE, TFT_BLACK);

@@ -166,7 +166,11 @@ BACNET_STACK_EXPORT
 void datalink_set_interface(char *ifname);
 
 BACNET_STACK_EXPORT
-void datalink_set(char *datalink_string);
+void datalink_set(const char *datalink_string);
+
+/* Stable transport name for retaining deferred-send context. */
+BACNET_STACK_EXPORT
+const char *datalink_name(void);
 
 BACNET_STACK_EXPORT
 void datalink_maintenance_timer(uint16_t seconds);

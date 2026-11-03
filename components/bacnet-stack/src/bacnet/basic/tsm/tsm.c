@@ -36,6 +36,9 @@ uint8_t Handler_Transmit_Buffer[MAX_PDU];
 /* declare space for the TSM transactions, and set it up in the init. */
 /* table rules: an Invoke ID = 0 is an unused spot in the table */
 static BACNET_TSM_DATA TSM_List[MAX_TSM_TRANSACTIONS];
+#if defined(BACDL_MULTIPLE)
+static const char *TSM_Datalinks[MAX_TSM_TRANSACTIONS];
+#endif
 
 /* invoke ID for incrementing between subsequent calls. */
 static uint8_t Current_Invoke_ID = 1;
@@ -236,6 +239,9 @@ void tsm_set_confirmed_unsegmented_transaction(
             plist->apdu_len = apdu_len;
             npdu_copy_data(&plist->npdu_data, ndpu_data);
             bacnet_address_copy(&plist->dest, dest);
+#if defined(BACDL_MULTIPLE)
+            TSM_Datalinks[index] = datalink_name();
+#endif
         }
     }
 
@@ -315,9 +321,16 @@ void tsm_timer_milliseconds(uint16_t milliseconds)
                 if (plist->RetryCount < apdu_retries()) {
                     plist->RequestTimer = apdu_timeout();
                     plist->RetryCount++;
+#if defined(BACDL_MULTIPLE)
+                    const char *previous_datalink = datalink_name();
+                    datalink_set(TSM_Datalinks[i]);
+#endif
                     bytes_sent = datalink_send_pdu(
                         &plist->dest, &plist->npdu_data, &plist->apdu[0],
                         plist->apdu_len);
+#if defined(BACDL_MULTIPLE)
+                    datalink_set(previous_datalink);
+#endif
                     DEBUG_PRINTF(
                         "invoke-id[%u] Retry %u of %u after %ums\n",
                         plist->InvokeID, plist->RetryCount, apdu_retries(),

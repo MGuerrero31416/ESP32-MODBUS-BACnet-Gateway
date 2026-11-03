@@ -38,6 +38,9 @@
 typedef struct BACnet_COV_Address {
     bool valid : 1;
     BACNET_ADDRESS dest;
+#if defined(BACDL_MULTIPLE)
+    const char *datalink;
+#endif
 } BACNET_COV_ADDRESS;
 
 /* note: This COV service only monitors the properties
@@ -135,6 +138,10 @@ static int cov_address_add(const BACNET_ADDRESS *dest)
             if (valid) {
                 cov_dest = &COV_Addresses[i].dest;
                 found = bacnet_address_same(dest, cov_dest);
+#if defined(BACDL_MULTIPLE)
+                found = found &&
+                    strcmp(COV_Addresses[i].datalink, datalink_name()) == 0;
+#endif
                 if (found) {
                     index = i;
                     break;
@@ -150,6 +157,9 @@ static int cov_address_add(const BACNET_ADDRESS *dest)
                     cov_dest = &COV_Addresses[i].dest;
                     bacnet_address_copy(cov_dest, dest);
                     COV_Addresses[i].valid = true;
+#if defined(BACDL_MULTIPLE)
+                    COV_Addresses[i].datalink = datalink_name();
+#endif
                     break;
                 }
             }
@@ -361,6 +371,11 @@ static bool cov_list_subscribe(
             dest = cov_address_get(COV_Subscriptions[index].dest_index);
             if (dest) {
                 address_match = bacnet_address_same(src, dest);
+#if defined(BACDL_MULTIPLE)
+                address_match = address_match &&
+                    strcmp(COV_Addresses[COV_Subscriptions[index].dest_index].datalink,
+                        datalink_name()) == 0;
+#endif
             } else {
                 /* skip address matching - we don't have an address */
                 address_match = true;
@@ -471,6 +486,10 @@ static bool cov_send_request(
 #endif
         return status;
     }
+#if defined(BACDL_MULTIPLE)
+    const char *previous_datalink = datalink_name();
+    datalink_set(COV_Addresses[cov_subscription->dest_index].datalink);
+#endif
     datalink_get_my_address(&my_address);
     npdu_encode_npdu_data(
         &npdu_data, cov_subscription->flag.issueConfirmedNotifications,
@@ -519,7 +538,9 @@ static bool cov_send_request(
     }
 
 COV_FAILED:
-
+#if defined(BACDL_MULTIPLE)
+    datalink_set(previous_datalink);
+#endif
     return status;
 }
 

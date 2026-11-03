@@ -8,6 +8,7 @@
 #include "bacnet_app.h"
 #include "display.h"
 #include "gateway_hardware.h"
+#include "modbus_service.h"
 #include "stack_profiler.h"
 #include "User_Settings.h"
 #include <string.h>
@@ -53,5 +54,6 @@ void app_main(void)
         .cov = &bacnet_cov_task_handle,
     };
     ESP_ERROR_CHECK(bacnet_app_start(&task_handles));
+    ESP_ERROR_CHECK(modbus_service_start());
     app_supervisor_run();
 }

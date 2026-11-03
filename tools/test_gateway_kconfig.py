@@ -57,6 +57,9 @@ class GatewayKconfigTests(unittest.TestCase):
             "USER_MODBUS_RESPONSE_TIMEOUT_MS": "1000",
             "USER_MODBUS_RETRIES": "2",
             "USER_MODBUS_POLL_INTERVAL_MS": "1000",
+            "USER_MODBUS_MAX_READ_REGISTERS": "2",
+            "USER_MODBUS_MAX_READ_BITS": "1",
+            "USER_MODBUS_BACKOFF_MAX_MS": "30000",
         }
         for name, value in expected.items():
             with self.subTest(setting=name):
@@ -106,10 +109,28 @@ class GatewayKconfigTests(unittest.TestCase):
             ("USER_MODBUS_RESPONSE_TIMEOUT_MS", "0", "1000"),
             ("USER_MODBUS_RETRIES", "-1", "2"),
             ("USER_MODBUS_POLL_INTERVAL_MS", "0", "1000"),
+            ("USER_MODBUS_MAX_READ_REGISTERS", "1", "2"),
+            ("USER_MODBUS_MAX_READ_REGISTERS", "126", "2"),
+            ("USER_MODBUS_MAX_READ_BITS", "0", "1"),
+            ("USER_MODBUS_MAX_READ_BITS", "2001", "1"),
+            ("USER_MODBUS_BACKOFF_MAX_MS", "999", "30000"),
+            ("USER_MODBUS_BACKOFF_MAX_MS", "60001", "30000"),
         ):
             with self.subTest(setting=name):
                 self.config.syms[name].set_value(invalid)
                 self.assertEqual(self.value(name), default)
+
+    def test_modbus_group_limits_and_backoff_are_configurable(self):
+        self.select("USER_DISPLAY_IDEASPARK")
+        for name, value in (
+            ("USER_MODBUS_MAX_READ_REGISTERS", "125"),
+            ("USER_MODBUS_MAX_READ_BITS", "2000"),
+            ("USER_MODBUS_BACKOFF_MAX_MS", "60000"),
+            ("USER_MODBUS_RETRIES", "0"),
+        ):
+            with self.subTest(setting=name):
+                self.config.syms[name].set_value(value)
+                self.assertEqual(self.value(name), value)
 
     def test_ideaspark_backlight_variants_do_not_use_serial_pins(self):
         self.select("USER_DISPLAY_IDEASPARK")

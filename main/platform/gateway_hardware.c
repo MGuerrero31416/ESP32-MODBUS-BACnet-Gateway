@@ -202,7 +202,7 @@ esp_err_t gateway_hardware_validate(void)
     ESP_LOGI(TAG, "Modbus timeout=%d ms, retries=%d, poll interval=%d ms",
         CONFIG_USER_MODBUS_RESPONSE_TIMEOUT_MS, CONFIG_USER_MODBUS_RETRIES,
         CONFIG_USER_MODBUS_POLL_INTERVAL_MS);
-    ESP_LOGW(TAG, "Modbus hardware configuration only; polling is not implemented");
+    ESP_LOGI(TAG, "Modbus RTU enabled; the point table determines polling traffic");
     if (USER_ENABLE_BACNET_MSTP) {
         ESP_LOGI(TAG, "MS/TP UART%d TX=%d RX=%d DE/RE=%d",
             CONFIG_USER_MSTP_UART_PORT, CONFIG_USER_MSTP_UART_TX_GPIO,

@@ -2,8 +2,9 @@
 
 ESP32-WROOM-32 with a 1.9-inch ST7789 LCD, native 170x320 resolution.
 The compact four-row UI is shared with HW657A and runs in 320x170 landscape.
-It shows mapped point count, Wi-Fi state, recent MS/TP traffic, inactive Modbus
-status, and the BACnet device ID/MS/TP MAC. There are no touch controls.
+It shows mapped point count, Wi-Fi state, recent MS/TP traffic, Modbus good/total
+acquisition count (or No points/Disabled), and the BACnet device ID/MS/TP MAC.
+There are no touch controls.
 
 ## Selection
 
@@ -76,8 +77,10 @@ memory and console reservations before initializing buses.
 The DE/RE convention is high to transmit, low to receive.
 
 **Conversion stage:** the compiled point table now defines BACnet objects.
-Its active configuration is empty until a register map is supplied. No Modbus
-driver or polling task is started yet. Sensor tasks and sensor role indexes
+Its active configuration is empty until a register map is supplied, so no Modbus
+driver or polling task starts by default. With mappings, the dedicated worker
+polls using UART RTS for DE/RE control; the existing BACnet dispatcher publishes
+snapshots/reliability and queues permitted writes. Sensor tasks and sensor role indexes
 have been removed; GPIO13/14 are no longer reserved for sensor I2C.
 No hardware commissioning has been performed.
 

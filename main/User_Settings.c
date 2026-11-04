@@ -8,7 +8,7 @@
 
 #include "User_Private_Settings.h"
 
-const char USER_BACNET_FIRMWARE_REVISION[] = "1.0 2026_11_03";
+const char USER_BACNET_FIRMWARE_REVISION[] = "gateway-v1.0.0-rc1 2026_11_03";
 
 const bool USER_ENABLE_BACNET_IP = true;
 const bool USER_WIFI_USE_STATIC_IP = true;
@@ -20,7 +20,7 @@ const char USER_WIFI_STATIC_DNS[] = "8.8.8.8";
 const char USER_BACNET_DEVICE_NAME[] = "55534";
 const uint32_t USER_BACNET_DEVICE_INSTANCE = 55534;
 const int USER_OVERRIDE_NVS_ON_FLASH = 0;
-const char USER_BACNET_DEVICE_DESCRIPTION[] = "Modbus-BACnet-GW-01";
+const char USER_BACNET_DEVICE_DESCRIPTION[] = "Modbus-BACnet-GW-v1.0.0-rc1";
 const char USER_BACNET_MODEL_NAME[] = "ESP32-55534";
 const char USER_BACNET_VENDOR_NAME[] = "ESCAP FMS";
 const uint16_t USER_BACNET_VENDOR_ID = 260;

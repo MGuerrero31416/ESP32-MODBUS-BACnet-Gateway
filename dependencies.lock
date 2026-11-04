@@ -214,14 +214,12 @@ dependencies:
       type: service
     version: 1.8.2
   espressif/esp-modbus:
-    component_hash: 26a64a9531b5e15a1bbdb9064f2f8715df5b150bfb821dd493174a5aa7566bf8
     dependencies:
     - name: idf
-      require: private
       version: '>=5.0'
     source:
-      registry_url: https://components.espressif.com/
-      type: service
+      path: vendor/esp-modbus
+      type: local
     version: 2.1.4
   espressif/esp-zboss-lib:
     component_hash: 321883d142421f65009972408287441794250057668a11abbdfd8bec77c3309a
@@ -388,6 +386,6 @@ direct_dependencies:
 - idf
 - lvgl/lvgl
 - u8g2
-manifest_hash: 9bb6c82acf7bc8388f7bf78cced00d0f10d1ab568e4ea61fff6c7f96f88a8aa2
+manifest_hash: e4cf6ff70194f659d00d14894c7bcca71f3820857e2a639a53ee33b13a983b47
 target: esp32
 version: 3.0.0

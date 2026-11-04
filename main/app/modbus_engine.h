@@ -72,6 +72,7 @@ typedef struct {
     uint32_t transactions;
     uint32_t timeouts;
     uint32_t errors;
+    uint32_t exceptions; /* Slave exception responses; included in errors. */
     uint32_t writes_ok;
     uint32_t writes_failed;
 } modbus_counters_t;

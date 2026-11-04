@@ -54,10 +54,13 @@ void bacnet_app_maintenance_1s(void);
 /* Send a BACnet I-Am on MS/TP when MS/TP is enabled. */
 void bacnet_app_send_mstp_i_am(void);
 
-/* Clear the existing MS/TP diagnostic counters. */
+/* Clear the 30 s MS/TP diagnostic window counters. Does not clear the
+ * monotonic PDU counter returned by bacnet_app_get_mstp_pdu_count(). */
 void bacnet_app_reset_mstp_diagnostics(void);
 
-/* Used by the display link-alive logic. */
+/* Monotonic count of MS/TP PDUs received for this node (wraps at 2^32).
+ * Used by the display link-alive logic, which detects changes between
+ * consecutive samples; callers must not assume it is ever reset. */
 uint32_t bacnet_app_get_mstp_pdu_count(void);
 
 /* Return the current Wi-Fi station connection state. */

@@ -44,6 +44,9 @@ typedef struct {
 typedef struct {
     struct { int port, mode, baudrate, parity, uid, response_tout_ms, data_bits, stop_bits; } ser_opts;
 } mb_communication_info_t;
+typedef int mb_err_enum_t;
+enum { MB_ENOERR, MB_ETIMEDOUT, MB_ERECVDATA, MB_EILLFUNC };
+typedef struct { mb_err_enum_t mb_error; bool slave_exception; uint8_t exception_code; } mb_master_last_error_t;
 extern const gateway_point_mapping_t USER_POINT_MAPPINGS[];
 extern const size_t USER_POINT_MAPPING_COUNT;
 int64_t esp_timer_get_time(void);
@@ -64,6 +67,7 @@ esp_err_t mbc_master_start(void *);
 esp_err_t mbc_master_stop(void *);
 esp_err_t mbc_master_delete(void *);
 esp_err_t mbc_master_send_request(void *, mb_param_request_t *, void *);
+esp_err_t mbc_master_get_last_error(void *, mb_master_last_error_t *);
 esp_err_t uart_set_pin(int, int, int, int, int);
 esp_err_t uart_set_mode(int, int);
 """
@@ -187,6 +191,11 @@ esp_err_t mbc_master_send_request(void *master, mb_param_request_t *r, void *dat
     } else {
         assert(r->command == 6 && r->reg_size == 1 && ((uint16_t *)data)[0] == 77);
     }
+    return ESP_OK;
+}
+esp_err_t mbc_master_get_last_error(void *master, mb_master_last_error_t *info) {
+    assert(master == &stage && info);
+    info->mb_error = MB_ENOERR; info->slave_exception = false; info->exception_code = 0;
     return ESP_OK;
 }
 int main(int argc, char **argv) {

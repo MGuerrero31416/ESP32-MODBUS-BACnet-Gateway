@@ -666,10 +666,18 @@ void bacnet_app_send_mstp_i_am(void)
 
 void bacnet_app_reset_mstp_diagnostics(void)
 {
+    static uint32_t s_pdu_count_at_last_reset = 0;
     uint32_t rx_bytes = MSTP_RS485_Rx_Bytes_Get_Reset();
     uint32_t preamble_55 = 0;
     uint32_t preamble_55ff = 0;
-    uint32_t pdu_count = s_mstp_pdu_count;
+    /*
+     * s_mstp_pdu_count is monotonic: the supervisor liveness check detects
+     * edges on it, so it must never be cleared here. Derive the 30 s window
+     * value as an unsigned delta (wrap-safe) for the diagnostic log instead.
+     */
+    uint32_t pdu_count_now = s_mstp_pdu_count;
+    uint32_t pdu_count = pdu_count_now - s_pdu_count_at_last_reset;
+    s_pdu_count_at_last_reset = pdu_count_now;
 
     MSTP_RS485_Preamble_Counts_Get_Reset(&preamble_55, &preamble_55ff);
 
@@ -694,7 +702,6 @@ void bacnet_app_reset_mstp_diagnostics(void)
         (unsigned long)pdu_count);
     */
 
-    s_mstp_pdu_count = 0;
     s_mstp_apdu_count = 0;
     s_mstp_rp_total = 0;
     s_mstp_wp_total = 0;
@@ -774,6 +781,8 @@ static void bacnet_mstp_receive_task(void *pvParameters)
         memset(&src, 0, sizeof(src));
         pdu_len = dlmstp_receive(&src, rx_buffer, sizeof(rx_buffer), 0);
         if (pdu_len > 0) {
+            /* Wire-level liveness: counted in both dispatcher and legacy modes. */
+            s_mstp_pdu_count++;
             bacnet_event_t evt = {0};
             evt.type = BACNET_EVENT_RX_FRAME_MSTP;
             evt.link_id = BACNET_EVENT_LINK_MSTP;
@@ -792,7 +801,6 @@ static void bacnet_mstp_receive_task(void *pvParameters)
 
 #if !BACNET_USE_DISPATCHER_CORE
             bacnet_profile_notify(BACNET_APP_PROFILE_MSTP_RX);
-            s_mstp_pdu_count++;
             BACNET_ADDRESS dest = {0};
             BACNET_NPDU_DATA npdu_data = {0};
             int apdu_offset = bacnet_npdu_decode(

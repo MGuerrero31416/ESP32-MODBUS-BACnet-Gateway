@@ -19,6 +19,12 @@ CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_SILENT=y
 
 # CONFIG_ESP_WIFI_IRAM_OPT is not set
 
+# Keep the UART ISR in IRAM so RS485 RTS turnaround and RX handling are not
+# stalled while the flash cache is disabled (NVS commits, Wi-Fi). Prevents
+# intermittent Modbus RTU response loss. esp-modbus honors this via
+# MB_PORT_SERIAL_ISR_FLAG.
+CONFIG_UART_ISR_IN_IRAM=y
+
 # Disable unused networking features
 
 # CONFIG_LWIP_IPV6 is not set

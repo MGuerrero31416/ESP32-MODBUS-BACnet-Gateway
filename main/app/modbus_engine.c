@@ -147,6 +147,8 @@ static modbus_result_t transfer(modbus_engine_t *e, modbus_request_t *request)
         ++e->counters.errors;
         if (result == MODBUS_TIMEOUT) {
             ++e->counters.timeouts;
+        } else if (result == MODBUS_EXCEPTION) {
+            ++e->counters.exceptions;
         }
     }
     return result;

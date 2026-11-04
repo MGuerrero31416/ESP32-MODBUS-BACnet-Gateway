@@ -48,12 +48,27 @@ static modbus_result_t request_transfer(void *context, modbus_request_t *request
     if (err == ESP_OK) {
         return MODBUS_OK;
     }
+    if (err == ESP_ERR_INVALID_RESPONSE) {
+        /*
+         * esp-modbus reports both a slave exception response (MB_EILLFUNC) and a
+         * corrupted or mismatched frame (MB_ERECVDATA) as ESP_ERR_INVALID_RESPONSE.
+         * The vendored component retains the raw outcome so they can be told apart:
+         * a slave exception is a protocol-level answer from a healthy link.
+         */
+        mb_master_last_error_t info;
+        if (mbc_master_get_last_error(master, &info) == ESP_OK && info.slave_exception) {
+            ESP_LOGW(TAG, "Slave %u FC%02u address=%u count=%u: exception 0x%02X",
+                request->slave, request->function, request->address, request->quantity,
+                (unsigned)info.exception_code);
+            return MODBUS_EXCEPTION;
+        }
+    }
     ESP_LOGW(TAG, "Slave %u FC%02u address=%u count=%u: %s",
         request->slave, request->function, request->address, request->quantity,
         esp_err_to_name(err));
     switch (err) {
     case ESP_ERR_TIMEOUT: return MODBUS_TIMEOUT;
-    case ESP_ERR_INVALID_RESPONSE: return MODBUS_BAD_RESPONSE;
+    case ESP_ERR_INVALID_RESPONSE: return MODBUS_BAD_RESPONSE; /* CRC, address or function mismatch, malformed */
     case ESP_FAIL:
     case ESP_ERR_NOT_SUPPORTED: return MODBUS_EXCEPTION;
     default: return MODBUS_IO_ERROR;
@@ -103,11 +118,12 @@ static void worker(void *context)
         if (now - last_report >= 30000) {
             modbus_service_status_t status;
             modbus_service_get_status(&status);
-            ESP_LOGI(TAG, "Good=%u faulted=%u transactions=%lu errors=%lu timeouts=%lu writes=%lu/%lu",
+            ESP_LOGI(TAG, "Good=%u faulted=%u transactions=%lu errors=%lu timeouts=%lu exceptions=%lu writes=%lu/%lu",
                 status.good_points, status.faulted_points,
                 (unsigned long)status.counters.transactions,
                 (unsigned long)status.counters.errors,
                 (unsigned long)status.counters.timeouts,
+                (unsigned long)status.counters.exceptions,
                 (unsigned long)status.counters.writes_ok,
                 (unsigned long)status.counters.writes_failed);
             last_report = now;

@@ -305,6 +305,8 @@ static void test_recovery_and_staleness(void)
     f.failure = MODBUS_EXCEPTION;
     f.failures_left = 1;
     assert(modbus_engine_poll(&e) && f.calls == 1 && e.slaves[1].single_reads);
+    assert(e.counters.exceptions == 1 && e.counters.errors == 1 &&
+        e.slaves[1].next_probe_ms == 0 && e.slaves[1].failures == 0);
     f.now = 1000;
     assert(modbus_engine_poll(&e) && f.requests[1].quantity == 1);
     assert(modbus_engine_poll(&e) && f.requests[2].quantity == 1);

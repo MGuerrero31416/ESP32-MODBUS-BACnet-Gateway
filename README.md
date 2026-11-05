@@ -6,39 +6,10 @@ ESP32/ESP32-S3 gateway: a Modbus RTU client/master on one
 RS485 bus, with mapped points exposed over BACnet/IP (Wi-Fi) and BACnet MS/TP
 on a second RS485 bus. Board, display, and touch hardware profiles are retained.
 
-## Implementation and validation status
+## Project baseline
 
-The current Ideaspark ESP32-WROOM-32 deployment has been verified on hardware:
-
-- Modbus RTU: sustained polling with all eight points healthy and zero reported
-  errors/timeouts.
-- BACnet/IP: discovery and access verified with YABE over Wi-Fi.
-- BACnet MS/TP: device online in a Johnson Controls NAE. The earlier offline
-  condition was traced to physical wiring, not firmware.
-
-These observations precede the latest slave-exception classification and MS/TP
-liveness diagnostic fixes. Those fixes build successfully with ESP-IDF 6.0.2;
-subsequent hardware validation has not yet been reported.
-
-- **Step 1 complete:** independent serial configuration, startup GPIO/UART
-  conflict checks, and Ideaspark WROOM32 1.9-inch defaults.
-- **Step 2 complete:** a single validated compiled point-mapping table replaces
-  sensor roles and parallel object arrays. BACnet objects are created from
-  mappings. Sensor, LoRa acquisition, and Adafruit IO application tasks are
-  disconnected.
-- **Step 3 complete:** Modbus RTU polling, typed decoding, bounded read grouping,
-  retries/offline recovery, stale detection, and queued writes with completion
-  diagnostics. Ideaspark/HW657A show Modbus acquisition status.
-- **Step 4 complete:** Modbus snapshots update mapped BACnet values/reliability.
-  Permitted Present_Value writes use the existing asynchronous Modbus queue;
-  Out_Of_Service supports local simulation without new Modbus commands.
-- **Step 5 software validation complete:** discovery and ReadProperty retain
-  their ingress link; COV subscriptions and confirmed retries retain their own
-  transport. Host protocol tests cover IP-only, MS/TP-only and interleaved
-  dual-link scenarios. Both BACnet links have also been verified on hardware
-  alongside Modbus polling.
-- **Still pending:** hardware validation of the latest fixes and complete
-  gateway UI layouts.
+The Ideaspark ESP32-WROOM-32 deployment has been tested successfully with
+Modbus RTU polling and both BACnet/IP over Wi-Fi and BACnet MS/TP.
 
 The active mapping table contains **eight read-only points**: four input
 registers (FC04, zero-based addresses 0-3) mapped to Analog Inputs 1-4, and four
@@ -87,6 +58,16 @@ Allocate Modbus GPIOs explicitly before enabling it on another board.
 Object metadata overrides use the `gw_points_v1` NVS namespace. Old sensor
 object settings are not loaded, and process values/commands are not restored.
 Normally leave `USER_OVERRIDE_NVS_ON_FLASH = 0`.
+
+## Photos
+
+Prototype test. One MAX485 to Modbus, another MAX485 to NAE
+
+<img src="docs/images/GatewayPrototype.jpg" alt="Prototype" />
+
+Gateway test with Metasys(MSTP) and YABE (WiFi)
+
+<img src="docs/images/MODBUS_BACnet Gateway-NAE.png" alt="Gateway test with NAE (MSTP) and YABE (WiFi)" />
 
 ## Build and tests
 
@@ -143,7 +124,6 @@ main/
   main.c                   Validated startup
 ```
 
-Some retained low-level drivers and non-Ideaspark display documentation still
-describe the inherited sensor/radio application. They do not enable acquisition
-in the gateway firmware; their cleanup and full display conversion are later
-steps.
+Some retained low-level drivers and non-Ideaspark display documentation describe
+the inherited sensor/radio application. They do not enable acquisition in the
+gateway firmware.
